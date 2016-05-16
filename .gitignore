@@ -46,3 +46,4 @@ Makefile.in
 .deps
 .dirstamp
 .idea/
+server/
