@@ -1684,8 +1684,8 @@ void janus_ice_cb_nice_recv(NiceAgent *agent, guint stream_id, guint component_i
 							GList *pts = stream->audio_payload_types;
 							while(pts) {
 								guint16 audio_pt = GPOINTER_TO_UINT(pts->data);
+								JANUS_LOG(LOG_FATAL, "Comparing %"SCNu16" and %"SCNu16"\n", pt, audio_pt);
 								if(pt == audio_pt) {
-									JANUS_LOG(LOG_FATAL, "Comparing %"SCNu16" and %"SCNu16"\n", pt, audio_pt);
 									JANUS_LOG(LOG_VERB, "[%"SCNu64"] Unadvertized SSRC (%"SCNu32") is audio! (payload type %"SCNu16")\n", handle->handle_id, packet_ssrc, pt);
 									video = 0;
 									stream->audio_ssrc_peer = packet_ssrc;
@@ -1699,8 +1699,8 @@ void janus_ice_cb_nice_recv(NiceAgent *agent, guint stream_id, guint component_i
 							GList *pts = stream->video_payload_types;
 							while(pts) {
 								guint16 video_pt = GPOINTER_TO_UINT(pts->data);
+								JANUS_LOG(LOG_FATAL, "Comparing %"SCNu16" and %"SCNu16"\n", pt, video_pt);
 								if(pt == video_pt) {
-									JANUS_LOG(LOG_FATAL, "Comparing %"SCNu16" and %"SCNu16"\n", pt, video_pt);
 									JANUS_LOG(LOG_VERB, "[%"SCNu64"] Unadvertized SSRC (%"SCNu32") is video! (payload type %"SCNu16")\n", handle->handle_id, packet_ssrc, pt);
 									video = 1;
 									stream->video_ssrc_peer = packet_ssrc;
