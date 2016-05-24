@@ -1677,6 +1677,7 @@ void janus_ice_cb_nice_recv(NiceAgent *agent, guint stream_id, guint component_i
 					/* FIXME In case it happens, we should check what it is */
 					if(stream->audio_ssrc_peer == 0 || stream->video_ssrc_peer == 0) {
 						/* Apparently we were not told the peer SSRCs, try to guess from the payload type */
+						JANUS_LOG(LOG_FATAL, "%p, %p\n", stream->audio_payload_types, stream->video_payload_types);
 						gboolean found = FALSE;
 						guint16 pt = header->type;
 						if(stream->audio_ssrc_peer == 0 && stream->audio_payload_types) {
@@ -1684,6 +1685,7 @@ void janus_ice_cb_nice_recv(NiceAgent *agent, guint stream_id, guint component_i
 							while(pts) {
 								guint16 audio_pt = GPOINTER_TO_UINT(pts->data);
 								if(pt == audio_pt) {
+									JANUS_LOG(LOG_FATAL, "Comparing %"SCNu16" and %"SCNu16"\n", pt, audio_pt);
 									JANUS_LOG(LOG_VERB, "[%"SCNu64"] Unadvertized SSRC (%"SCNu32") is audio! (payload type %"SCNu16")\n", handle->handle_id, packet_ssrc, pt);
 									video = 0;
 									stream->audio_ssrc_peer = packet_ssrc;
@@ -1698,6 +1700,7 @@ void janus_ice_cb_nice_recv(NiceAgent *agent, guint stream_id, guint component_i
 							while(pts) {
 								guint16 video_pt = GPOINTER_TO_UINT(pts->data);
 								if(pt == video_pt) {
+									JANUS_LOG(LOG_FATAL, "Comparing %"SCNu16" and %"SCNu16"\n", pt, video_pt);
 									JANUS_LOG(LOG_VERB, "[%"SCNu64"] Unadvertized SSRC (%"SCNu32") is video! (payload type %"SCNu16")\n", handle->handle_id, packet_ssrc, pt);
 									video = 1;
 									stream->video_ssrc_peer = packet_ssrc;
