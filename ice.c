@@ -809,7 +809,7 @@ int janus_ice_set_turn_server(gchar *turn_server, uint16_t turn_port, gchar *tur
 	return 0;
 }
 
-int janus_ice_set_turn_rest_api(gchar *api_server, gchar *api_key) {
+int janus_ice_set_turn_rest_api(gchar *api_server, gchar *api_key, gchar *api_method) {
 #ifndef HAVE_LIBCURL
 	JANUS_LOG(LOG_ERR, "Janus has been nuilt with no libcurl support, TURN REST API unavailable\n");
 	return -1; 
@@ -819,7 +819,7 @@ int janus_ice_set_turn_rest_api(gchar *api_server, gchar *api_key) {
 		JANUS_LOG(LOG_ERR, "Invalid TURN REST API backend: not an HTTP address\n");
 		return -1;
 	}
-	janus_turnrest_set_backend(api_server, api_key);
+	janus_turnrest_set_backend(api_server, api_key, api_method);
 	JANUS_LOG(LOG_INFO, "TURN REST API backend: %s\n", api_server ? api_server : "(disabled)");
 #endif
 	return 0;
@@ -1168,6 +1168,10 @@ void janus_ice_stream_free(GHashTable *streams, janus_ice_stream *stream) {
 		g_free(stream->rpass);
 		stream->rpass = NULL;
 	}
+	g_list_free(stream->audio_payload_types);
+	stream->audio_payload_types = NULL;
+	g_list_free(stream->video_payload_types);
+	stream->video_payload_types = NULL;
 	g_free(stream->audio_rtcp_ctx);
 	stream->audio_rtcp_ctx = NULL;
 	g_free(stream->video_rtcp_ctx);
@@ -1671,8 +1675,43 @@ void janus_ice_cb_nice_recv(NiceAgent *agent, guint stream_id, guint component_i
 				video = ((stream->video_ssrc_peer == packet_ssrc || stream->video_ssrc_peer_rtx == packet_ssrc) ? 1 : 0);
 				if(!video && stream->audio_ssrc_peer != packet_ssrc) {
 					/* FIXME In case it happens, we should check what it is */
-					JANUS_LOG(LOG_WARN, "Not video and not audio? dropping (SSRC %"SCNu32")...\n", packet_ssrc);
-					return;
+					if(stream->audio_ssrc_peer == 0 || stream->video_ssrc_peer == 0) {
+						/* Apparently we were told the peer SSRCs, try to guess from the payload type */
+						gboolean found = FALSE;
+						guint16 pt = header->type;
+						if(stream->audio_ssrc_peer == 0 && stream->audio_payload_types) {
+							GList *pts = stream->audio_payload_types;
+							while(pts) {
+								guint16 audio_pt = GPOINTER_TO_UINT(pts->data);
+								if(pt == audio_pt) {
+									JANUS_LOG(LOG_VERB, "[%"SCNu64"] Unadvertized SSRC (%"SCNu32") is audio! (payload type %"SCNu16")\n", handle->handle_id, packet_ssrc, pt);
+									video = 0;
+									stream->audio_ssrc_peer = packet_ssrc;
+									found = TRUE;
+									break;
+								}
+								pts = pts->next;
+							}
+						}
+						if(!found && stream->video_ssrc_peer == 0 && stream->video_payload_types) {
+							GList *pts = stream->video_payload_types;
+							while(pts) {
+								guint16 audio_pt = GPOINTER_TO_UINT(pts->data);
+								if(pt == audio_pt) {
+									JANUS_LOG(LOG_VERB, "[%"SCNu64"] Unadvertized SSRC (%"SCNu32") is video! (payload type %"SCNu16")\n", handle->handle_id, packet_ssrc, pt);
+									video = 1;
+									stream->video_ssrc_peer = packet_ssrc;
+									found = TRUE;
+									break;
+								}
+								pts = pts->next;
+							}
+						}
+					}
+					if(!video && stream->audio_ssrc_peer != packet_ssrc) {
+						JANUS_LOG(LOG_WARN, "[%"SCNu64"] Not video and not audio? dropping (SSRC %"SCNu32")...\n", handle->handle_id, packet_ssrc);
+						return;
+					}
 				}
 				if(stream->video_ssrc_peer_rtx == packet_ssrc) {
 					/* FIXME This is a video retransmission: set the regular peer SSRC so
@@ -3079,7 +3118,7 @@ void *janus_ice_send_thread(void *data) {
 		}
 		if(now-video_rtcp_last_sr >= 500000) {
 			janus_ice_stream *stream = janus_flags_is_set(&handle->webrtc_flags, JANUS_ICE_HANDLE_WEBRTC_BUNDLE) ? (handle->audio_stream ? handle->audio_stream : handle->video_stream) : (handle->video_stream);
-			if(stream && stream->rtp_component && stream->rtp_component->out_stats.audio_packets > 0) {
+			if(stream && stream->rtp_component && stream->rtp_component->out_stats.video_packets > 0) {
 				/* Create a SR/SDES compound */
 				int srlen = 28;
 				int sdeslen = 20;
